@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .tile { fill: #18181B; }
+    .back { fill: #F6F6F3; opacity: 0.32; }
+    .card { fill: #F6F6F3; }
+    .ink { fill: #18181B; }
+    .muted { fill: #8A847B; }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #EDEDEA; }
+      .back { fill: #18181B; opacity: 0.22; }
+      .card { fill: #18181B; }
+      .ink { fill: #EDEDEA; }
+      .muted { fill: #8A8A86; }
+    }
+  </style>
+  <rect class="tile" width="32" height="32" rx="7.5"/>
+  <rect class="back" x="8.5" y="5.5" width="14" height="18" rx="2" transform="rotate(-9 15.5 14.5)"/>
+  <rect class="card" x="10" y="8" width="13.5" height="17.5" rx="2"/>
+  <rect class="ink" x="12.5" y="11.5" width="8.5" height="2.4" rx="0.6"/>
+  <rect class="muted" x="12.5" y="15.4" width="6" height="1.6" rx="0.5"/>
+  <circle cx="13.6" cy="21.6" r="1.3" fill="#C2643C"/>
+</svg>
