@@ -184,3 +184,30 @@ describe('composition', () => {
     expect(s.ok).toBe(false);
   });
 });
+
+describe('content integrity across every layout', () => {
+  const imgEnv = mockEnv({ upload: { width: 1600, height: 1000, luma: lumaGrid(0.3) } });
+  const samples = [
+    normalizeContent({ kind: 'article', title: 'Quiet web returns', body: 'Personal sites are back again.', sourceName: 'Margin', author: 'Ada Park', image: img }),
+    normalizeContent({ kind: 'quote', quote: 'Less but better.', attribution: 'Dieter Rams', sourceName: 'Interview' }),
+    normalizeContent({ kind: 'text', title: 'Ship early', body: 'Then improve with feedback.', attribution: 'Notes' }),
+    normalizeContent({ kind: 'text', body: '87% of teams ship weekly.', author: 'Survey desk' }),
+    normalizeContent({ kind: 'image', image: img, title: 'Harbour light', attribution: 'Jane Doe' }),
+  ];
+  const words = (s) => s.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}%]+/gu, ' ').trim().split(' ').filter(Boolean);
+
+  for (const layout of LAYOUTS) {
+    for (const content of samples) {
+      if (!eligibility(layout, content, defaultDesign(), imgEnv).ok) continue;
+      it(`${layout.id} shows every word of ${content.kind}${content.title ? ` "${content.title}"` : ''}`, () => {
+        for (const outputPresetId of ['portrait', 'landscape', 'story']) {
+          const s = composeCard(doc(content, { layoutId: layout.id, outputPresetId }), imgEnv, { fallback: false });
+          if (!s.fits) continue;
+          const shown = new Set(words(texts(s).join(' ')));
+          const expected = [content.title, content.body, content.quote, content.attribution, content.author, content.sourceName].filter(Boolean).flatMap(words);
+          for (const w of expected) expect(shown.has(w), `${layout.id}@${outputPresetId} missing "${w}"`).toBe(true);
+        }
+      });
+    }
+  }
+});

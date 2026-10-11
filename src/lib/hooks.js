@@ -1,17 +1,23 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { loadFonts } from '../render/fonts.js';
+import { loadFamilies, loadFonts } from '../render/fonts.js';
 import { createMeasure } from '../render/measure.js';
 
-/** Fonts + a canvas measurer, ready once the bundled faces have loaded. */
-export function useMeasure() {
+/**
+ * A canvas measurer, ready once `families` have loaded (all bundled fonts
+ * when omitted). Other families keep loading in the background.
+ */
+export function useMeasure(families) {
   const [ready, setReady] = useState(false);
+  const key = families ? families.join('|') : '';
   useEffect(() => {
     let alive = true;
-    loadFonts().then(() => alive && setReady(true));
+    const needed = key ? loadFamilies(key.split('|')) : loadFonts();
+    needed.then(() => alive && setReady(true));
+    if (key) loadFonts();
     return () => {
       alive = false;
     };
-  }, []);
+  }, [key]);
   return useMemo(() => (ready ? createMeasure() : null), [ready]);
 }
 

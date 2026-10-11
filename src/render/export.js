@@ -52,12 +52,12 @@ function defaultDownload(blob, filename) {
 
 /**
  * @param doc      { content, design }
- * @param deps     { env, images, texture, ensureFonts, ensureImages, createCanvas, download }
+ * @param deps     { env, images, textures, ensureFonts, ensureImages, createCanvas, download }
  * @returns        { filename, width, height, bytes }
  */
 export async function exportCard(doc, formatId, deps) {
   const format = EXPORT_FORMATS.find((f) => f.id === formatId) ?? EXPORT_FORMATS[0];
-  const { env, images = {}, texture = null } = deps;
+  const { env, images = {}, textures = {} } = deps;
   const createCanvas = deps.createCanvas ?? defaultCanvas;
   const download = deps.download ?? defaultDownload;
 
@@ -76,13 +76,16 @@ export async function exportCard(doc, formatId, deps) {
     if (op.type === 'image' && !images[op.assetId]) {
       throw new ExportError('image', 'An image is still loading or failed to load. Re-add it and try again.');
     }
+    if (op.type === 'texture' && !textures[op.id]) {
+      throw new ExportError('texture', 'The background texture is still loading. Try again in a moment.');
+    }
   }
 
   // 5. Render at exact pixel size.
   const canvas = createCanvas(scene.width, scene.height);
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new ExportError('canvas', 'Your browser could not create an image of this size.');
-  renderScene(ctx, scene, { scale: 1, images, texture });
+  renderScene(ctx, scene, { scale: 1, images, textures });
   if (canvas.width !== scene.width || canvas.height !== scene.height) {
     throw new ExportError('size', 'The rendered image did not match the selected size.');
   }

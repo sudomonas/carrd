@@ -9,6 +9,13 @@ const GROTESK = 'Carrd Space Grotesk';
 const PLEX = 'Carrd Plex Sans';
 const PLEX_MONO = 'Carrd Plex Mono';
 const JB_MONO = 'Carrd JetBrains Mono';
+const PLAYFAIR = 'Carrd Playfair';
+const GARAMOND = 'Carrd EB Garamond';
+const DM_SANS = 'Carrd DM Sans';
+const MANROPE = 'Carrd Manrope';
+const INSTRUMENT = 'Carrd Instrument Serif';
+const BRICOLAGE = 'Carrd Bricolage';
+const DM_SERIF = 'Carrd DM Serif Display';
 
 export const SANS_FALLBACK = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
 export const SERIF_FALLBACK = 'Georgia, "Times New Roman", serif';
@@ -87,6 +94,90 @@ export const FONT_PAIRS = [
     lineHeight: { display: 1.14, text: 1.5 },
     scale: { display: 0.84, text: 0.86 },
   },
+  {
+    id: 'classic',
+    label: 'Classic',
+    note: 'Garamond, bookish and calm',
+    display: { family: GARAMOND, fallback: SERIF_FALLBACK, weight: 600 },
+    quote: { family: GARAMOND, fallback: SERIF_FALLBACK, weight: 400, style: 'italic' },
+    text: { family: GARAMOND, fallback: SERIF_FALLBACK, weight: 400 },
+    meta: { family: INTER, fallback: SANS_FALLBACK, weight: 600, tracking: 0.12, uppercase: true },
+    mono: { family: JB_MONO, fallback: MONO_FALLBACK, weight: 400 },
+    lineHeight: { display: 1.1, text: 1.4 },
+    scale: { display: 1.06, text: 1.1 },
+  },
+  {
+    id: 'magazine',
+    label: 'Magazine',
+    note: 'Playfair headlines, DM Sans text',
+    display: { family: PLAYFAIR, fallback: SERIF_FALLBACK, weight: 700 },
+    quote: { family: PLAYFAIR, fallback: SERIF_FALLBACK, weight: 400, style: 'italic' },
+    text: { family: DM_SANS, fallback: SANS_FALLBACK, weight: 400 },
+    meta: { family: DM_SANS, fallback: SANS_FALLBACK, weight: 500, tracking: 0.14, uppercase: true },
+    mono: { family: JB_MONO, fallback: MONO_FALLBACK, weight: 400 },
+    lineHeight: { display: 1.08, text: 1.45 },
+    scale: { display: 0.98, text: 0.96 },
+  },
+  {
+    id: 'elegant',
+    label: 'Elegant',
+    note: 'Condensed display serif',
+    display: { family: INSTRUMENT, fallback: SERIF_FALLBACK, weight: 400 },
+    quote: { family: INSTRUMENT, fallback: SERIF_FALLBACK, weight: 400, style: 'italic' },
+    text: { family: INTER, fallback: SANS_FALLBACK, weight: 400 },
+    meta: { family: INTER, fallback: SANS_FALLBACK, weight: 500, tracking: 0.16, uppercase: true },
+    mono: { family: JB_MONO, fallback: MONO_FALLBACK, weight: 400 },
+    lineHeight: { display: 1.02, text: 1.45 },
+    scale: { display: 1.16, text: 0.94 },
+  },
+  {
+    id: 'statement',
+    label: 'Statement',
+    note: 'Heavy display serif',
+    display: { family: DM_SERIF, fallback: SERIF_FALLBACK, weight: 400 },
+    quote: { family: DM_SERIF, fallback: SERIF_FALLBACK, weight: 400, style: 'italic' },
+    text: { family: DM_SANS, fallback: SANS_FALLBACK, weight: 400 },
+    meta: { family: DM_SANS, fallback: SANS_FALLBACK, weight: 500, tracking: 0.12, uppercase: true },
+    mono: { family: JB_MONO, fallback: MONO_FALLBACK, weight: 400 },
+    lineHeight: { display: 1.06, text: 1.45 },
+    scale: { display: 1, text: 0.96 },
+  },
+  {
+    id: 'grotesque',
+    label: 'Grotesque',
+    note: 'Characterful sans display',
+    display: { family: BRICOLAGE, fallback: SANS_FALLBACK, weight: 700 },
+    quote: { family: BRICOLAGE, fallback: SANS_FALLBACK, weight: 600 },
+    text: { family: DM_SANS, fallback: SANS_FALLBACK, weight: 400 },
+    meta: { family: BRICOLAGE, fallback: SANS_FALLBACK, weight: 600, tracking: 0.08, uppercase: true },
+    mono: { family: JB_MONO, fallback: MONO_FALLBACK, weight: 400 },
+    lineHeight: { display: 1.04, text: 1.45 },
+    scale: { display: 0.96, text: 0.96 },
+  },
+  {
+    id: 'swiss',
+    label: 'Swiss',
+    note: 'Heavy Manrope, tight and clean',
+    display: { family: MANROPE, fallback: SANS_FALLBACK, weight: 800 },
+    quote: { family: MANROPE, fallback: SANS_FALLBACK, weight: 600 },
+    text: { family: MANROPE, fallback: SANS_FALLBACK, weight: 400 },
+    meta: { family: MANROPE, fallback: SANS_FALLBACK, weight: 600, tracking: 0.1, uppercase: true },
+    mono: { family: PLEX_MONO, fallback: MONO_FALLBACK, weight: 400 },
+    lineHeight: { display: 1.06, text: 1.45 },
+    scale: { display: 0.9, text: 0.94 },
+  },
+  {
+    id: 'friendly',
+    label: 'Friendly',
+    note: 'Rounded geometric DM Sans',
+    display: { family: DM_SANS, fallback: SANS_FALLBACK, weight: 700 },
+    quote: { family: DM_SANS, fallback: SANS_FALLBACK, weight: 500 },
+    text: { family: DM_SANS, fallback: SANS_FALLBACK, weight: 400 },
+    meta: { family: DM_SANS, fallback: SANS_FALLBACK, weight: 500, tracking: 0.1, uppercase: true },
+    mono: { family: JB_MONO, fallback: MONO_FALLBACK, weight: 400 },
+    lineHeight: { display: 1.08, text: 1.45 },
+    scale: { display: 0.96, text: 0.96 },
+  },
 ];
 
 export const DEFAULT_FONT_PAIR_ID = 'literary';
@@ -104,6 +195,13 @@ export const FAMILIES = [
   { id: 'inter', label: 'Inter', family: INTER, fallback: SANS_FALLBACK, category: 'Sans', display: 700, quote: [500, 'normal'], meta: 600 },
   { id: 'space-grotesk', label: 'Space Grotesk', family: GROTESK, fallback: SANS_FALLBACK, category: 'Sans', display: 600, quote: [500, 'normal'], meta: 500 },
   { id: 'plex-sans', label: 'IBM Plex Sans', family: PLEX, fallback: SANS_FALLBACK, category: 'Sans', display: 600, quote: [400, 'italic'], meta: 600 },
+  { id: 'playfair', label: 'Playfair Display', family: PLAYFAIR, fallback: SERIF_FALLBACK, category: 'Serif', display: 700, quote: [400, 'italic'], meta: 700 },
+  { id: 'eb-garamond', label: 'EB Garamond', family: GARAMOND, fallback: SERIF_FALLBACK, category: 'Serif', display: 600, quote: [400, 'italic'], meta: 600 },
+  { id: 'instrument-serif', label: 'Instrument Serif', family: INSTRUMENT, fallback: SERIF_FALLBACK, category: 'Serif', display: 400, quote: [400, 'italic'], meta: 400 },
+  { id: 'dm-serif-display', label: 'DM Serif Display', family: DM_SERIF, fallback: SERIF_FALLBACK, category: 'Serif', display: 400, quote: [400, 'italic'], meta: 400 },
+  { id: 'dm-sans', label: 'DM Sans', family: DM_SANS, fallback: SANS_FALLBACK, category: 'Sans', display: 700, quote: [500, 'normal'], meta: 500 },
+  { id: 'manrope', label: 'Manrope', family: MANROPE, fallback: SANS_FALLBACK, category: 'Sans', display: 800, quote: [600, 'normal'], meta: 600 },
+  { id: 'bricolage', label: 'Bricolage Grotesque', family: BRICOLAGE, fallback: SANS_FALLBACK, category: 'Sans', display: 700, quote: [600, 'normal'], meta: 600 },
   { id: 'plex-mono', label: 'IBM Plex Mono', family: PLEX_MONO, fallback: MONO_FALLBACK, category: 'Mono', display: 500, quote: [400, 'normal'], meta: 500 },
   { id: 'jetbrains-mono', label: 'JetBrains Mono', family: JB_MONO, fallback: MONO_FALLBACK, category: 'Mono', display: 700, quote: [400, 'italic'], meta: 500 },
 ];

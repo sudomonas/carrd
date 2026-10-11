@@ -10,6 +10,7 @@ There's no account, no tracking and no AI. Composition is done by a deterministi
 - Inside the Palette and Typography controls you can **create your own palettes and font pairings**:
   - **Palettes:** set the six semantic roles with colour pickers or hex values. Live contrast checks warn about readability (4.5:1 for text, 3:1 for muted text and accents).
   - **Pairings:** choose headline, body and code fonts from the bundled families. carrd still controls sizes, weights and line heights.
+  - Names must be unique.
   - Edits preview live on the card before you save. Saved styles persist in the browser (up to 12 of each), and deleting one can be undone.
 
 ## Commands
@@ -42,17 +43,40 @@ src/
                 text.js     – measurement-driven wrapping & fitting
                 code.js     – language detection + tokenizer
                 color.js    – WCAG contrast, overlay solver
-                layouts/    – registry + editorial, centered, cinematic, headline, code, list
-  render/       canvas.js (scene → canvas), fonts.js, measure.js, images.js, export.js
+                layouts/    – registry + 11 layouts (see below)
+  render/       canvas.js (scene → canvas, tinted texture patterns), fonts.js, measure.js, images.js, export.js
   lib/          storage.js (localStorage + IndexedDB), useAssets.js, theme.js, hooks.js, samplePhoto.js
   components/   React UI
 server/         ip.js, fetch.js (SSRF-safe fetch), parse.js, meta.js (handler), index.js
-scripts/        make-texture.mjs (generates the committed paper texture)
+scripts/        make-textures.mjs (generates the committed texture tiles)
 tests/          Vitest unit tests
 e2e/            Playwright tests, fixture photo, visual baselines
 ```
 
 **One renderer for preview and export.** `composeCard(doc, env)` is pure JavaScript with no React or DOM dependency. It returns a *scene*: rects, gradients, image crops and positioned text lines at exact output pixels. The same `renderScene()` draws that scene for the live preview (scaled to the screen), the layout thumbnails, and the export (scale 1). Text is measured with canvas `measureText` using the same bundled font files the renderer draws with. Fonts are registered under `Carrd …` family names so a system font with the same name can never be used by mistake. That's why the preview and the exported file can't drift apart, and no HTML-to-image conversion is needed.
+
+### Catalogue
+
+| | |
+|---|---|
+| **Layouts (11)** | Editorial, Centered, Cinematic, Headline, Code, Index (lists), Split (photo and text halves), Framed (double-rule letterpress quote), Post (social-post card with avatar initials), Figure (a big leading number such as "87%"), Poster (short text, each line stretched edge to edge) |
+| **Palettes (20)** | Light, muted, dark and bold/high-contrast groups. A unit test checks every palette for 4.5:1 text contrast and 3:1 muted-text and accent contrast. |
+| **Pairings (13)** | Literary, Editorial, Neutral, Modern, Technical, Monospace, Classic, Magazine, Elegant, Statement, Grotesque, Swiss, Friendly |
+| **Backgrounds** | Solid, Gradient, Photo, Source image, plus six textures: Paper, Linen, Grain, Dots, Grid and Stripes. Each texture is a static alpha-mask tile from `scripts/make-textures.mjs` (`npm run textures`), tinted with a palette colour when drawn, so it suits every palette and scales with the card. |
+| **Sizes (30 presets)** | Common, Instagram, TikTok, X, LinkedIn, Facebook, Threads, Bluesky, Pinterest, YouTube and Web (Open Graph, blog header), plus Custom. Banners wider than 3:1 are left out because no layout composes well at that ratio. |
+
+Layouts never drop content:
+- Poster and Figure are only eligible when they can show all of the text.
+- Post requires a real author or attribution and never invents a name.
+- A test checks that every eligible layout shows every word of the title, body, quote, attribution, author and source.
+
+**Shuffle** (the dice button in the studio header) picks a random layout, palette, typography and background. Your own palettes and pairings are included, and photo backgrounds are only offered when there's a photo.
+- **Size is never changed:** it's where the card is going, not a style choice.
+- **Always fits:** every candidate is composed, and only one where all the text fits is accepted. If nothing fits, carrd says so instead of producing a broken card.
+- **Undo:** the confirmation toast offers Undo.
+- **Testable:** the logic is the pure function `shuffleDesign()` in `src/engine/shuffle.js`, which takes an injectable random source.
+
+**Fonts load on demand.** The studio waits only for the families the current pairing uses, and loads the rest in the background. Text measurement is rebuilt whenever a family finishes loading, so cached widths never come from a fallback font.
 
 **Custom styles** use the same shape as the built-ins. Their ids are prefixed `custom-` and `customfont-`, and they're resolved through `env.palettes` and `env.fontPairs` in the engine. A pairing is stored only as its family choices (`{display, text, code}`) and rebuilt by `buildFontPair()`. Every face it can reference is bundled, and a unit test checks every combination. A palette or pairing that's being edited is passed to the engine as a temporary entry, so the preview, thumbnails and export all reflect it.
 
@@ -94,7 +118,7 @@ The production server also sends a strict CSP and `nosniff`/`no-referrer` header
 | Package | Why | License |
 |---|---|---|
 | react, react-dom | UI | MIT |
-| @fontsource/{inter, source-serif-4, fraunces, space-grotesk, ibm-plex-sans, ibm-plex-mono, jetbrains-mono} | bundled card fonts (latin subset, woff2) | OFL-1.1 |
+| @fontsource/{inter, source-serif-4, fraunces, space-grotesk, ibm-plex-sans, ibm-plex-mono, jetbrains-mono, playfair-display, eb-garamond, dm-sans, manrope, instrument-serif, bricolage-grotesque, dm-serif-display} | bundled card fonts (latin subset, woff2) | OFL-1.1 |
 | vite, @vitejs/plugin-react | dev server and build | MIT |
 | vitest | unit tests | MIT |
 | @playwright/test | browser tests: exact export dimensions, responsive checks, visual baselines | Apache-2.0 |

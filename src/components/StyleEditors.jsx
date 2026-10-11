@@ -1,6 +1,10 @@
 import { useEffect, useId, useState } from 'react';
 import { PALETTES, PALETTE_ROLES } from '../config/palettes.js';
+import { FONT_PAIRS } from '../config/typography.js';
 import { FAMILIES, CODE_FAMILIES, buildFontPair, getFamily } from '../config/typography.js';
+
+/** Case-insensitive check against every other entry's name. */
+const nameTaken = (name, id, entries) => entries.some((e) => e.id !== id && e.label.trim().toLowerCase() === name.trim().toLowerCase());
 import { NAME_LIMIT, paletteChecks } from '../model/library.js';
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -70,6 +74,7 @@ export function PaletteEditor({ initial, isNew, library, onDraft, onSave, onCanc
 
   const setRole = (role, hex) => setPalette((p) => ({ ...p, roles: { ...p.roles, [role]: hex } }));
   const checks = paletteChecks(palette.roles);
+  const taken = nameTaken(palette.label, palette.id, [...PALETTES, ...library.palettes]);
   const sources = [...PALETTES, ...library.palettes.filter((p) => p.id !== palette.id)];
 
   return (
@@ -81,7 +86,8 @@ export function PaletteEditor({ initial, isNew, library, onDraft, onSave, onCanc
       <div className="row-2">
         <div className="field">
           <label className="label" htmlFor={nameId}>Name</label>
-          <input id={nameId} className="input" value={palette.label} maxLength={NAME_LIMIT} onChange={(e) => setPalette((p) => ({ ...p, label: e.target.value }))} />
+          <input id={nameId} className="input" value={palette.label} maxLength={NAME_LIMIT} aria-invalid={taken} aria-describedby={taken ? `${nameId}-taken` : undefined} onChange={(e) => setPalette((p) => ({ ...p, label: e.target.value }))} />
+          {taken && <span className="field-error" id={`${nameId}-taken`}>That name is already used.</span>}
         </div>
         <div className="field">
           <label className="label" htmlFor={`${nameId}-from`}>Start from</label>
@@ -116,7 +122,7 @@ export function PaletteEditor({ initial, isNew, library, onDraft, onSave, onCanc
       </ul>
       <EditorActions
         isNew={isNew}
-        canSave={palette.label.trim().length > 0}
+        canSave={palette.label.trim().length > 0 && !taken}
         saveLabel={isNew ? 'Save palette' : 'Save changes'}
         onCancel={onCancel}
         onDelete={onDelete}
@@ -144,13 +150,14 @@ function FamilySelect({ label, value, onChange, options }) {
 }
 
 /** Builds a pairing from bundled families; sizes stay with the engine. */
-export function FontPairEditor({ initial, isNew, onDraft, onSave, onCancel, onDelete }) {
+export function FontPairEditor({ initial, isNew, library, onDraft, onSave, onCancel, onDelete }) {
   const [label, setLabel] = useState(initial.label);
   const [spec, setSpec] = useState(initial.spec);
   const nameId = useId();
   const pair = buildFontPair({ id: initial.id, label: label.trim() || 'My pairing', ...spec });
   useEffect(() => onDraft(buildFontPair({ id: initial.id, label: label.trim() || 'My pairing', ...spec })), [label, spec, initial.id, onDraft]);
 
+  const taken = nameTaken(label, initial.id, [...FONT_PAIRS, ...library.fontPairs]);
   const css = (face) => ({ fontFamily: `"${face.family}", ${face.fallback}`, fontWeight: face.weight, fontStyle: face.style ?? 'normal' });
   return (
     <div className="style-editor" role="group" aria-labelledby={`${nameId}-title`}>
@@ -160,7 +167,8 @@ export function FontPairEditor({ initial, isNew, onDraft, onSave, onCancel, onDe
       </div>
       <div className="field">
         <label className="label" htmlFor={nameId}>Name</label>
-        <input id={nameId} className="input" value={label} maxLength={NAME_LIMIT} onChange={(e) => setLabel(e.target.value)} />
+        <input id={nameId} className="input" value={label} maxLength={NAME_LIMIT} aria-invalid={taken} aria-describedby={taken ? `${nameId}-taken` : undefined} onChange={(e) => setLabel(e.target.value)} />
+        {taken && <span className="field-error" id={`${nameId}-taken`}>That name is already used.</span>}
       </div>
       <div className="row-2">
         <FamilySelect label="Headline" value={spec.display} options={FAMILIES} onChange={(display) => setSpec((s) => ({ ...s, display }))} />
@@ -176,7 +184,7 @@ export function FontPairEditor({ initial, isNew, onDraft, onSave, onCancel, onDe
       </div>
       <EditorActions
         isNew={isNew}
-        canSave={label.trim().length > 0}
+        canSave={label.trim().length > 0 && !taken}
         saveLabel={isNew ? 'Save pairing' : 'Save changes'}
         onCancel={onCancel}
         onDelete={onDelete}

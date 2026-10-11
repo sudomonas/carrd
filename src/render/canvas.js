@@ -17,6 +17,27 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// Tinted copies of pattern masks, keyed by texture id + colour.
+const tintCache = new Map();
+
+function tintedTile(tile, color) {
+  const key = `${tile.src ?? ''}|${color}`;
+  let c = tintCache.get(key);
+  if (!c) {
+    c = document.createElement('canvas');
+    c.width = tile.naturalWidth ?? tile.width;
+    c.height = tile.naturalHeight ?? tile.height;
+    const g = c.getContext('2d');
+    g.drawImage(tile, 0, 0);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = color;
+    g.fillRect(0, 0, c.width, c.height);
+    if (tintCache.size > 200) tintCache.clear();
+    tintCache.set(key, c);
+  }
+  return c;
+}
+
 function paint(ctx, fill) {
   if (typeof fill === 'string') return fill;
   const g = ctx.createLinearGradient(fill.x0, fill.y0, fill.x1, fill.y1);
@@ -27,9 +48,9 @@ function paint(ctx, fill) {
 /**
  * @param ctx      CanvasRenderingContext2D
  * @param scene    result of composeCard()
- * @param options  { scale, images: { [assetId]: CanvasImageSource }, texture: CanvasImageSource }
+ * @param options  { scale, images: { [assetId]: CanvasImageSource }, textures: { [textureId]: HTMLImageElement } }
  */
-export function renderScene(ctx, scene, { scale = 1, images = {}, texture = null } = {}) {
+export function renderScene(ctx, scene, { scale = 1, images = {}, textures = {} } = {}) {
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.clearRect(0, 0, scene.width, scene.height);
   ctx.textBaseline = 'alphabetic';
@@ -58,11 +79,14 @@ export function renderScene(ctx, scene, { scale = 1, images = {}, texture = null
         break;
       }
       case 'texture': {
-        if (!texture) break;
+        const tile = textures[op.id ?? 'paper'];
+        if (!tile) break;
         ctx.save();
-        ctx.globalCompositeOperation = 'soft-light';
-        ctx.globalAlpha = 0.9;
-        ctx.fillStyle = ctx.createPattern(texture, 'repeat');
+        const pattern = ctx.createPattern(tintedTile(tile, op.color), 'repeat');
+        // Pattern space follows the card: one tile pixel = `scale` card pixels.
+        if (op.scale && pattern.setTransform) pattern.setTransform(new DOMMatrix().scale(op.scale));
+        ctx.globalAlpha = op.alpha ?? 0.9;
+        ctx.fillStyle = pattern;
         ctx.fillRect(op.x, op.y, op.w, op.h);
         ctx.restore();
         break;

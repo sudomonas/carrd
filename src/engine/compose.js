@@ -6,7 +6,7 @@ import { LAYOUTS, getLayout } from './layouts/index.js';
 import { getPalette } from '../config/palettes.js';
 import { getFontPair } from '../config/typography.js';
 import { resolveOutput } from '../config/outputs.js';
-import { BACKGROUNDS } from '../config/backgrounds.js';
+import { BACKGROUNDS, getBackground, getTexture } from '../config/backgrounds.js';
 import { contentTextLength, hasRenderableContent } from '../model/document.js';
 import { mix, solveOverlayAlpha, withAlpha } from './color.js';
 import { imageOp, marginsFor, regionLuma, unitFor, px } from './layouts/shared.js';
@@ -90,7 +90,17 @@ export function rankLayouts(content, design, env) {
 
 function backgroundOps(bg, colors, W, H, env) {
   const ops = [{ type: 'rect', x: 0, y: 0, w: W, h: H, fill: colors.canvas }];
-  if (bg.id === 'texture') ops.push({ type: 'texture', x: 0, y: 0, w: W, h: H });
+  const texture = getTexture(getBackground(bg.id).texture);
+  if (texture) {
+    ops.push({
+      type: 'texture',
+      id: texture.id,
+      alpha: texture.alpha,
+      color: colors[texture.role === 'mutedText' ? 'muted' : texture.role],
+      scale: texture.scale * unitFor(W, H),
+      x: 0, y: 0, w: W, h: H,
+    });
+  }
   if (bg.id === 'gradient') {
     ops[0] = {
       type: 'rect', x: 0, y: 0, w: W, h: H,
@@ -190,14 +200,14 @@ export function composeCard(doc, env, options = {}) {
       if (alt === layout) continue;
       const r = runLayout(alt, content, design, env);
       if (r.fits) {
-        notices.push({ level: 'info', text: `${layout.label} can't fit this content at ${out.label}; showing ${alt.label} instead.` });
+        notices.push({ level: 'info', text: `${layout.label} can't fit this content at ${out.name}; showing ${alt.label} instead.` });
         layout = alt;
         result = r;
         break;
       }
     }
   }
-  if (!result.fits) notices.push({ level: 'error', text: overflowMessage(layout, result, content, out.label) });
+  if (!result.fits) notices.push({ level: 'error', text: overflowMessage(layout, result, content, out.name) });
   if (result.bg.missing === 'source') notices.push({ level: 'info', text: 'This content has no source image, so a solid background is used.' });
 
   return {

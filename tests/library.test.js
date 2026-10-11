@@ -5,6 +5,8 @@ import { getPalette } from '../src/config/palettes.js';
 import { normalizeDesign, normalizeContent, defaultDesign } from '../src/model/document.js';
 import { composeCard } from '../src/engine/compose.js';
 import { mockEnv } from './helpers.js';
+import { FACES } from '../src/render/fonts.js';
+import { FONT_PAIRS } from '../src/config/typography.js';
 
 const roles = { canvas: '#1F3D2B', surface: '#16243A', text: '#E6ECF5', mutedText: '#8D9BB0', accent: '#E8B04B', divider: '#26364F' };
 const palette = { id: 'custom-forest', label: 'Forest', roles };
@@ -42,22 +44,24 @@ describe('library validation', () => {
 
 describe('pairing builder', () => {
   it('only references bundled weights for every family combination', () => {
-    // Mirrors the faces registered in src/render/fonts.js.
-    const bundled = new Set([
-      'Carrd Inter/400/normal', 'Carrd Inter/400/italic', 'Carrd Inter/500/normal', 'Carrd Inter/600/normal', 'Carrd Inter/700/normal',
-      'Carrd Source Serif/400/normal', 'Carrd Source Serif/400/italic', 'Carrd Source Serif/600/normal',
-      'Carrd Fraunces/400/normal', 'Carrd Fraunces/400/italic', 'Carrd Fraunces/600/normal',
-      'Carrd Space Grotesk/400/normal', 'Carrd Space Grotesk/500/normal', 'Carrd Space Grotesk/600/normal',
-      'Carrd Plex Sans/400/normal', 'Carrd Plex Sans/400/italic', 'Carrd Plex Sans/600/normal',
-      'Carrd Plex Mono/400/normal', 'Carrd Plex Mono/500/normal',
-      'Carrd JetBrains Mono/400/normal', 'Carrd JetBrains Mono/400/italic', 'Carrd JetBrains Mono/500/normal', 'Carrd JetBrains Mono/700/normal',
-    ]);
+    const bundled = new Set(FACES.map(([family, weight, style]) => `${family}/${weight}/${style}`));
     for (const d of FAMILIES) {
       for (const t of FAMILIES) {
         const p = buildFontPair({ id: 'customfont-x', label: 'x', display: d.id, text: t.id, code: 'jetbrains-mono' });
         for (const face of [p.display, p.quote, p.text, p.meta, p.mono]) {
           expect(bundled.has(`${face.family}/${face.weight}/${face.style ?? 'normal'}`), `${d.id}+${t.id}: ${face.family} ${face.weight}`).toBe(true);
         }
+      }
+    }
+  });
+});
+
+describe('built-in pairings', () => {
+  it('only use bundled faces', () => {
+    const bundled = new Set(FACES.map(([family, weight, style]) => `${family}/${weight}/${style}`));
+    for (const p of FONT_PAIRS) {
+      for (const face of [p.display, p.quote, p.text, p.meta, p.mono]) {
+        expect(bundled.has(`${face.family}/${face.weight}/${face.style ?? 'normal'}`), `${p.id}: ${face.family} ${face.weight}`).toBe(true);
       }
     }
   });

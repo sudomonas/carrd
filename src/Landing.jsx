@@ -3,7 +3,12 @@ import { composeCard, selectLayout } from './engine/compose.js';
 import { defaultDesign, normalizeContent } from './model/document.js';
 import { emptySource, sourceToContent } from './model/input.js';
 import { PALETTES } from './config/palettes.js';
-import { FONT_PAIRS } from './config/typography.js';
+import { FONT_PAIRS, getFontPair } from './config/typography.js';
+import { OUTPUT_PRESETS, PLATFORMS } from './config/outputs.js';
+import { LAYOUTS } from './engine/layouts/index.js';
+import { familiesOf } from './render/fonts.js';
+import { useTextures } from './lib/textures.js';
+import { TEXTURES } from './config/backgrounds.js';
 import { useMeasure, useReveal, useWidth } from './lib/hooks.js';
 import { createSamplePhoto } from './lib/samplePhoto.js';
 import { HANDOFF_KEY } from './lib/storage.js';
@@ -12,7 +17,7 @@ import ThemeToggle from './components/ThemeToggle.jsx';
 import './styles/landing.css';
 
 const DEMO_TEXT = '“The details are not the details. They make the design.”\n— Charles Eames';
-const DEMO_PALETTES = ['warm-paper', 'ink', 'sage', 'midnight', 'clay', 'newsprint'];
+const DEMO_PALETTES = ['warm-paper', 'ink', 'sage', 'midnight', 'clay', 'cobalt', 'sunflower'];
 const DEMO_SIZES = [
   { id: 'portrait', label: '4:5' },
   { id: 'square', label: '1:1' },
@@ -65,7 +70,49 @@ const GALLERY = [
     content: { kind: 'list', title: 'Three rules for small tools', items: ['Do one thing and do it well', 'Defaults matter more than options', 'Ship the boring version first'] },
     design: { paletteId: 'sage', fontPairId: 'literary', backgroundId: 'gradient' },
   },
+  {
+    layout: 'split',
+    caption: 'Split',
+    note: 'Photo and words, half and half',
+    content: { kind: 'article', title: 'Notes from a slower harbour town', body: 'Three days without a schedule, and what it taught me about attention.', sourceName: 'Field Notes', image: photo },
+    design: { paletteId: 'linen', fontPairId: 'magazine' },
+  },
+  {
+    layout: 'framed',
+    caption: 'Framed',
+    note: 'Letterpress-style quotes',
+    content: { kind: 'quote', quote: 'Have nothing in your house that you do not know to be useful, or believe to be beautiful.', attribution: 'William Morris', sourceName: 'Hopes and Fears for Art' },
+    design: { paletteId: 'espresso', fontPairId: 'classic' },
+  },
+  {
+    layout: 'post',
+    caption: 'Post',
+    note: 'Social-style posts',
+    content: { kind: 'text', body: 'Shipped the smallest possible version today. It does one thing. People already love it more than the big plan.', author: 'Ada Park', sourceName: 'adapark.dev' },
+    design: { paletteId: 'mist', fontPairId: 'friendly' },
+  },
+  {
+    layout: 'figure',
+    caption: 'Figure',
+    note: 'Stats and milestones',
+    content: { kind: 'text', body: '87% of readers decide in under three seconds whether to stop scrolling.', attribution: 'Attention report, 2026' },
+    design: { paletteId: 'cobalt', fontPairId: 'swiss' },
+  },
+  {
+    layout: 'poster',
+    caption: 'Poster',
+    note: 'A few words, very large',
+    content: { kind: 'text', body: 'Make it simple, but significant', attribution: 'Don Draper' },
+    design: { paletteId: 'sunflower', fontPairId: 'grotesque' },
+  },
 ];
+
+const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
+const inWords = (n) => NUMBER_WORDS[n] ?? String(n);
+const capitalize = (t) => t[0].toUpperCase() + t.slice(1);
+
+// Fonts the landing page renders with; everything else loads in the background.
+const LANDING_FAMILIES = [...new Set(['literary', ...GALLERY.map((g) => g.design.fontPairId)].flatMap((id) => familiesOf(getFontPair(id))))];
 
 const Arrow = () => (
   <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -93,7 +140,7 @@ function CardSkeleton({ width, ratio }) {
 }
 
 /** The hero's live demo: type a line, pick a palette, watch it compose. */
-function TryIt({ env, images, onNavigate }) {
+function TryIt({ env, images, textures, onNavigate }) {
   const [text, setText] = useState(DEMO_TEXT);
   const [paletteId, setPaletteId] = useState('warm-paper');
   const [size, setSize] = useState('portrait');
@@ -122,7 +169,7 @@ function TryIt({ env, images, onNavigate }) {
     <div className="tryit">
       <div className="tryit-stage" ref={frameRef}>
         {scene?.ok ? (
-          <SceneCanvas key={size} className="tryit-card" scene={scene} displayWidth={width} images={images} label="Live preview of your card" />
+          <SceneCanvas key={size} className="tryit-card" scene={scene} displayWidth={width} images={images} textures={textures} label="Live preview of your card" />
         ) : scene ? (
           <div className="tryit-empty" style={{ width, aspectRatio: ratio }}>Type something to see a card.</div>
         ) : (
@@ -169,13 +216,13 @@ function TryIt({ env, images, onNavigate }) {
   );
 }
 
-function GalleryItem({ item, images }) {
+function GalleryItem({ item, images, textures }) {
   const [ref, width] = useWidth();
   return (
     <figure className="gallery-item" data-reveal>
       <div ref={ref} className="gallery-frame">
         {item.scene?.ok && width > 0 ? (
-          <SceneCanvas scene={item.scene} displayWidth={width} images={images} label={`${item.caption} layout example`} className="gallery-card" />
+          <SceneCanvas scene={item.scene} displayWidth={width} images={images} textures={textures} label={`${item.caption} layout example`} className="gallery-card" />
         ) : (
           <CardSkeleton width="100%" ratio={1080 / 1350} />
         )}
@@ -188,7 +235,7 @@ function GalleryItem({ item, images }) {
   );
 }
 
-function Gallery({ env, images }) {
+function Gallery({ env, images, textures, onNavigate }) {
   const items = useMemo(() => {
     if (!env) return GALLERY;
     return GALLERY.map((g) => ({
@@ -198,7 +245,18 @@ function Gallery({ env, images }) {
   }, [env]);
   return (
     <div className="gallery">
-      {items.map((g) => <GalleryItem key={g.layout} item={g} images={images} />)}
+      {items.map((g) => <GalleryItem key={g.layout} item={g} images={images} textures={textures} />)}
+      <figure className="gallery-item gallery-yours" data-reveal>
+        <div className="gallery-yours-card">
+          <span className="gallery-yours-mark" aria-hidden="true">+</span>
+          <p>Your words, your palette, your size.</p>
+          <StudioLink onNavigate={onNavigate} className="btn btn-primary btn-sm">Make one <Arrow /></StudioLink>
+        </div>
+        <figcaption>
+          <strong>Yours</strong>
+          <span>Start in the studio</span>
+        </figcaption>
+      </figure>
     </div>
   );
 }
@@ -210,13 +268,13 @@ const STEPS = [
 ];
 
 function FiveControls() {
-  const shown = PALETTES.slice(0, 6);
+  const shown = PALETTES.filter((p) => ['warm-paper', 'sage', 'blush', 'forest', 'midnight', 'cobalt', 'sunflower'].includes(p.id));
   return (
     <div className="five">
       <div className="five-item" data-reveal>
         <span className="five-n">1</span>
         <h3>Layout</h3>
-        <p>Six compositions, filtered to what suits your content. Auto by default.</p>
+        <p>{capitalize(inWords(LAYOUTS.length))} compositions, filtered to what suits your content. Auto by default.</p>
         <div className="five-visual five-layouts" aria-hidden="true">
           <i className="l-ed" /><i className="l-ce" /><i className="l-he" />
         </div>
@@ -224,7 +282,7 @@ function FiveControls() {
       <div className="five-item" data-reveal>
         <span className="five-n">2</span>
         <h3>Palette</h3>
-        <p>Eight curated palettes with semantic roles — or build your own, with contrast checks.</p>
+        <p>{capitalize(inWords(PALETTES.length))} curated palettes with semantic roles — or build your own, with contrast checks.</p>
         <div className="five-visual five-swatches" aria-hidden="true">
           {shown.map((p) => <i key={p.id} style={{ background: p.roles.canvas, borderColor: p.roles.divider, color: p.roles.accent }} />)}
           <i className="add">+</i>
@@ -233,9 +291,9 @@ function FiveControls() {
       <div className="five-item" data-reveal>
         <span className="five-n">3</span>
         <h3>Typography</h3>
-        <p>Six bundled pairings, plus your own mixes. carrd sets the sizes.</p>
+        <p>{capitalize(inWords(FONT_PAIRS.length))} bundled pairings, plus your own mixes. carrd sets the sizes.</p>
         <div className="five-visual five-type" aria-hidden="true">
-          {FONT_PAIRS.slice(0, 4).map((f) => (
+          {FONT_PAIRS.filter((f) => ['literary', 'magazine', 'elegant', 'grotesque', 'swiss'].includes(f.id)).map((f) => (
             <span key={f.id} style={{ fontFamily: `"${f.display.family}", ${f.display.fallback}`, fontWeight: f.display.weight }}>Aa</span>
           ))}
         </div>
@@ -243,7 +301,7 @@ function FiveControls() {
       <div className="five-item" data-reveal>
         <span className="five-n">4</span>
         <h3>Background</h3>
-        <p>Solid, paper texture, gradient, your photo or the article’s image — readable by construction.</p>
+        <p>Solid, gradient, {inWords(TEXTURES.length)} textures from paper grain to graph paper, your photo or the article’s image — readable by construction.</p>
         <div className="five-visual five-bg" aria-hidden="true">
           <i className="bg-solid" /><i className="bg-texture" /><i className="bg-gradient" /><i className="bg-photo" />
         </div>
@@ -251,7 +309,7 @@ function FiveControls() {
       <div className="five-item" data-reveal>
         <span className="five-n">5</span>
         <h3>Size</h3>
-        <p>Square, portrait, story, landscape or custom. Changing size reflows — never stretches.</p>
+        <p>{OUTPUT_PRESETS.length} presets for {PLATFORMS.length - 1} platforms — Instagram to YouTube — or custom. Changing size reflows, never stretches.</p>
         <div className="five-visual five-sizes" aria-hidden="true">
           <i style={{ width: 22, height: 22 }} /><i style={{ width: 20, height: 25 }} /><i style={{ width: 16, height: 28 }} /><i style={{ width: 32, height: 18 }} />
         </div>
@@ -263,10 +321,11 @@ function FiveControls() {
 export default function Landing({ onNavigate }) {
   const rootRef = useRef(null);
   useReveal(rootRef);
-  const measure = useMeasure();
+  const measure = useMeasure(LANDING_FAMILIES);
   const sample = useMemo(() => createSamplePhoto(), []);
   const env = useMemo(() => (measure ? { measure, images: { sample: sample.stats } } : null), [measure, sample]);
   const images = useMemo(() => ({ sample: sample.element }), [sample]);
+  const textures = useTextures();
 
   return (
     <div className="landing" ref={rootRef}>
@@ -307,7 +366,7 @@ export default function Landing({ onNavigate }) {
               <li>Exact-pixel PNG &amp; JPEG</li>
             </ul>
           </div>
-          <TryIt env={env} images={images} onNavigate={onNavigate} />
+          <TryIt env={env} images={images} textures={textures} onNavigate={onNavigate} />
         </section>
 
         <section id="how" className="section">
@@ -329,10 +388,10 @@ export default function Landing({ onNavigate }) {
         <section id="layouts" className="section">
           <div className="section-head" data-reveal>
             <p className="eyebrow">Layouts</p>
-            <h2>Six compositions, chosen for your content.</h2>
+            <h2>{capitalize(inWords(LAYOUTS.length))} compositions, chosen for your content.</h2>
             <p className="section-lede">Every card below was rendered just now, in your browser, by the same engine the studio uses.</p>
           </div>
-          <Gallery env={env} images={images} />
+          <Gallery env={env} images={images} textures={textures} onNavigate={onNavigate} />
         </section>
 
         <section id="controls" className="section">

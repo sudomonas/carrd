@@ -9,7 +9,7 @@ test.describe('landing', () => {
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Content in.');
     await expect(page.getByRole('img', { name: 'Live preview of your card' })).toBeVisible();
-    await expect(page.locator('canvas.gallery-card')).toHaveCount(6);
+    await expect(page.locator('canvas.gallery-card')).toHaveCount(11);
     expect(errors).toEqual([]);
   });
 
@@ -71,19 +71,19 @@ test.describe('custom styles', () => {
     const before = await pixels();
     await page.getByLabel('Canvas colour picker').fill('#1f3d2b');
     await expect.poll(pixels).not.toBe(before); // live preview
-    await page.getByRole('textbox', { name: 'Name' }).fill('Forest');
+    await page.getByRole('textbox', { name: 'Name' }).fill('Pine');
     await page.getByRole('button', { name: 'Save palette' }).click();
-    await expect(page.getByRole('radio', { name: 'Forest' })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByRole('radio', { name: 'Pine' })).toHaveAttribute('aria-checked', 'true');
     await page.reload();
     await page.getByRole('tab', { name: 'Design' }).click();
-    await expect(page.getByRole('radio', { name: 'Forest' })).toHaveAttribute('aria-checked', 'true');
-    await page.getByRole('button', { name: 'Edit “Forest”' }).click();
+    await expect(page.getByRole('radio', { name: 'Pine' })).toHaveAttribute('aria-checked', 'true');
+    await page.getByRole('button', { name: 'Edit “Pine”' }).click();
     await page.getByRole('button', { name: 'Delete' }).click();
     await page.getByRole('button', { name: 'Click again to delete' }).click();
-    await expect(page.getByRole('radio', { name: 'Forest' })).toHaveCount(0);
+    await expect(page.getByRole('radio', { name: 'Pine' })).toHaveCount(0);
     await expect(page.getByRole('radio', { name: 'Warm paper' })).toHaveAttribute('aria-checked', 'true');
     await page.getByRole('button', { name: 'Undo' }).click();
-    await expect(page.getByRole('radio', { name: 'Forest' })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByRole('radio', { name: 'Pine' })).toHaveAttribute('aria-checked', 'true');
   });
 
   test('cancelling a new palette restores the previous look', async ({ page }) => {
@@ -116,4 +116,29 @@ test.describe('custom styles', () => {
     await page.getByRole('tab', { name: 'Design' }).click();
     await expect(page.getByRole('radio', { name: /My pairing 1/ })).toHaveAttribute('aria-checked', 'true');
   });
+});
+
+test('palette names must be unique', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await page.goto('/studio');
+  await page.locator('textarea').first().fill('Name check');
+  await page.getByRole('tab', { name: 'Design' }).click();
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name' }).fill('forest');
+  await expect(page.getByText('That name is already used.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save palette' })).toBeDisabled();
+});
+
+test('social presets: platform filter and exact export size', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await page.goto('/studio');
+  await page.locator('textarea').first().fill('A thumbnail that earns the click');
+  await page.getByRole('tab', { name: 'Design' }).click();
+  await page.getByRole('button', { name: 'YouTube' }).click();
+  await page.getByRole('radio', { name: /Thumbnail/ }).click();
+  await expect(page.locator('.preview-dims')).toContainText('YouTube · Thumbnail 1280 × 720');
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('.header-export .export-btn').click()]);
+  expect(download.suggestedFilename()).toMatch(/1280x720\.png$/);
+  const buf = (await import('node:fs')).readFileSync(await download.path());
+  expect([buf.readUInt32BE(16), buf.readUInt32BE(20)]).toEqual([1280, 720]);
 });

@@ -3,8 +3,9 @@ import { LAYOUTS } from '../engine/layouts/index.js';
 import { composeCard, eligibility, selectLayout } from '../engine/compose.js';
 import { PALETTES, getPalette } from '../config/palettes.js';
 import { FONT_PAIRS } from '../config/typography.js';
-import { BACKGROUNDS } from '../config/backgrounds.js';
-import { OUTPUT_PRESETS, CUSTOM_LIMITS, validateCustomSize } from '../config/outputs.js';
+import { BACKGROUNDS, getTexture } from '../config/backgrounds.js';
+import { TEXTURE_URLS } from '../lib/textures.js';
+import { OUTPUT_PRESETS, PLATFORMS, CUSTOM_LIMITS, getPreset, validateCustomSize } from '../config/outputs.js';
 import { ACCEPTED_TYPES } from '../render/images.js';
 import SceneCanvas from './SceneCanvas.jsx';
 import { PaletteEditor, FontPairEditor } from './StyleEditors.jsx';
@@ -30,7 +31,7 @@ function Section({ title, aside, children, id }) {
 
 const THUMB_WIDTH = 84;
 
-function LayoutControl({ design, content, env, scene, images, texture, onChange }) {
+function LayoutControl({ design, content, env, scene, images, textures, onChange }) {
   // Real miniatures: each eligible layout composed with the current content.
   const thumbs = useMemo(() => {
     if (!env) return [];
@@ -75,7 +76,7 @@ function LayoutControl({ design, content, env, scene, images, texture, onChange 
             title={layout.description}
           >
             <span className="thumb-frame" style={{ width: THUMB_WIDTH }}>
-              {s.ok && <SceneCanvas scene={s} displayWidth={THUMB_WIDTH} images={images} texture={texture} />}
+              {s.ok && <SceneCanvas scene={s} displayWidth={THUMB_WIDTH} images={images} textures={textures} />}
               {!s.fits && <span className="thumb-warn" title="Doesn't fit at this size">!</span>}
             </span>
             <span className="thumb-label">
@@ -92,6 +93,14 @@ function LayoutControl({ design, content, env, scene, images, texture, onChange 
   );
 }
 
+
+/** "My palette 3" — the first numbered name not already in use. */
+function nextName(base, entries) {
+  const used = new Set(entries.map((e) => e.label.toLowerCase()));
+  let n = 1;
+  while (used.has(`${base} ${n}`.toLowerCase())) n++;
+  return `${base} ${n}`;
+}
 
 const Plus = () => (
   <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
@@ -116,7 +125,7 @@ function PaletteControl({ value, library, onChange, onDraftStyle, onSaveStyle, o
 
   const startNew = () => {
     const base = getPalette(value, library.palettes);
-    setEditing({ isNew: true, initial: { id: newId('custom'), label: `My palette ${library.palettes.length + 1}`, tone: 'custom', custom: true, roles: { ...base.roles } } });
+    setEditing({ isNew: true, initial: { id: newId('custom'), label: nextName('My palette', library.palettes), tone: 'custom', custom: true, roles: { ...base.roles } } });
   };
 
   return (
@@ -183,7 +192,7 @@ function TypeControl({ value, library, onChange, onDraftStyle, onSaveStyle, onDe
   const full = library.fontPairs.length >= LIBRARY_LIMIT;
 
   const startNew = () => {
-    setEditing({ isNew: true, initial: { id: newId('customfont'), label: `My pairing ${library.fontPairs.length + 1}`, spec: { display: 'fraunces', text: 'inter', code: 'jetbrains-mono' } } });
+    setEditing({ isNew: true, initial: { id: newId('customfont'), label: nextName('My pairing', library.fontPairs), spec: { display: 'fraunces', text: 'inter', code: 'jetbrains-mono' } } });
   };
 
   return (
@@ -229,6 +238,7 @@ function TypeControl({ value, library, onChange, onDraftStyle, onSaveStyle, onDe
           key={editing.initial.id}
           initial={editing.initial}
           isNew={editing.isNew}
+          library={library}
           onDraft={onDraft}
           onCancel={close}
           onSave={(f) => {
@@ -245,7 +255,28 @@ function TypeControl({ value, library, onChange, onDraftStyle, onSaveStyle, onDe
   );
 }
 
-function BackgroundControl({ value, content, assets, onChange, onUpload, onRemove }) {
+/** A small live sample of a texture on the current palette. */
+function TextureSample({ texture, roles }) {
+  const url = TEXTURE_URLS[texture.id];
+  return (
+    <span className="texture-chip" style={{ backgroundColor: roles.canvas }}>
+      <span
+        className="texture-mask"
+        style={{
+          backgroundColor: roles[texture.role],
+          // Grains are faint by design; exaggerate them a little so the swatches read.
+          opacity: Math.min(1, texture.alpha * (texture.role === 'text' ? 3 : 1.4)),
+          WebkitMaskImage: `url(${url})`,
+          maskImage: `url(${url})`,
+          WebkitMaskSize: `${Math.round(texture.tile * 0.45)}px`,
+          maskSize: `${Math.round(texture.tile * 0.45)}px`,
+        }}
+      />
+    </span>
+  );
+}
+
+function BackgroundControl({ value, content, assets, palette, onChange, onUpload, onRemove }) {
   const fileRef = useRef(null);
   const [error, setError] = useState(null);
   const hasPhoto = assets.background?.status === 'ready';
@@ -262,8 +293,9 @@ function BackgroundControl({ value, content, assets, onChange, onUpload, onRemov
 
   return (
     <Section title="Background" id="ctl-bg">
-      <div className="chips" role="radiogroup" aria-labelledby="ctl-bg">
-        {BACKGROUNDS.map((b) => {
+      <div className="bg-options" role="radiogroup" aria-labelledby="ctl-bg">
+      <div className="chips">
+        {BACKGROUNDS.filter((b) => !b.texture).map((b) => {
           const disabled = b.id === 'source' && !hasSource;
           const label = b.id === 'photo' && !hasPhoto ? (loading ? 'Reading…' : 'Photo…') : b.label;
           return (
@@ -285,6 +317,27 @@ function BackgroundControl({ value, content, assets, onChange, onUpload, onRemov
             </button>
           );
         })}
+      </div>
+      <span className="sub-label" aria-hidden="true">Textures</span>
+      <div className="textures">
+        {BACKGROUNDS.filter((b) => b.texture).map((b) => (
+          <button
+            key={b.id}
+            type="button"
+            role="radio"
+            aria-checked={value === b.id}
+            aria-label={`${b.label} texture`}
+            className="texture-option"
+            onClick={() => onChange({ backgroundId: b.id })}
+          >
+            <TextureSample texture={getTexture(b.texture)} roles={palette.roles} />
+            <span className="texture-label">
+              {value === b.id && <Check />}
+              {b.label}
+            </span>
+          </button>
+        ))}
+      </div>
       </div>
       {!hasSource && <p className="hint" id={hintId}>Source image is available when the content has an image.</p>}
       {hasPhoto && (
@@ -313,6 +366,8 @@ function SizeControl({ design, onChange }) {
   const [h, setH] = useState(String(design.custom.height));
   const [error, setError] = useState(null);
   const errId = useId();
+  // Which platform's presets are listed; starts at the selected preset's platform.
+  const [platform, setPlatform] = useState(() => getPreset(design.outputPresetId)?.platform ?? 'common');
 
   useEffect(() => {
     setW(String(design.custom.width));
@@ -333,8 +388,27 @@ function SizeControl({ design, onChange }) {
   const custom = design.outputPresetId === 'custom';
   return (
     <Section title="Size" id="ctl-size">
-      <div className="sizes" role="radiogroup" aria-labelledby="ctl-size">
-        {[...OUTPUT_PRESETS, { id: 'custom', label: 'Custom', width: design.custom.width, height: design.custom.height }].map((p) => {
+      <div className="platforms" role="group" aria-label="Platform">
+        {PLATFORMS.map((pl) => {
+          const holdsSelection = getPreset(design.outputPresetId)?.platform === pl.id || (pl.id === 'common' && custom);
+          return (
+            <button
+              key={pl.id}
+              type="button"
+              className={`platform ${holdsSelection ? 'has-selection' : ''}`}
+              aria-pressed={platform === pl.id}
+              onClick={() => setPlatform(pl.id)}
+            >
+              {pl.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="sizes" role="radiogroup" aria-labelledby="ctl-size" key={platform}>
+        {[
+          ...OUTPUT_PRESETS.filter((p) => p.platform === platform),
+          ...(platform === 'common' ? [{ id: 'custom', label: 'Custom', width: design.custom.width, height: design.custom.height }] : []),
+        ].map((p) => {
           const ratio = p.width / p.height;
           return (
             <button
@@ -378,15 +452,16 @@ function SizeControl({ design, onChange }) {
   );
 }
 
-export default function DesignPanel({ design, library, onDraftStyle, onSaveStyle, onDeleteStyle, content, env, scene, images, texture, assets, onChange, onBackgroundImage, onRemoveBackgroundImage }) {
+export default function DesignPanel({ design, library, onDraftStyle, onSaveStyle, onDeleteStyle, content, env, scene, images, textures, assets, onChange, onBackgroundImage, onRemoveBackgroundImage }) {
   const styleProps = { library, onChange, onDraftStyle, onSaveStyle, onDeleteStyle };
   return (
     <div className="design-panel">
-      <LayoutControl design={design} content={content} env={env} scene={scene} images={images} texture={texture} onChange={onChange} />
+      <LayoutControl design={design} content={content} env={env} scene={scene} images={images} textures={textures} onChange={onChange} />
       <PaletteControl value={design.paletteId} {...styleProps} />
       <TypeControl value={design.fontPairId} {...styleProps} />
       <BackgroundControl
         value={design.backgroundId}
+        palette={getPalette(design.paletteId, env?.palettes ?? library.palettes)}
         content={content}
         assets={assets}
         onChange={onChange}

@@ -3,8 +3,11 @@ import { defaultDesign, hasRenderableContent, normalizeDesign } from './model/do
 import { emptySource, makeExcerpt, normalizeSource, sourceToContent } from './model/input.js';
 import { composeCard, eligibility, selectLayout } from './engine/compose.js';
 import { getLayout } from './engine/layouts/index.js';
+import { shuffleDesign } from './engine/shuffle.js';
+import { getPalette } from './config/palettes.js';
+import { getBackground } from './config/backgrounds.js';
 import { resolveOutput } from './config/outputs.js';
-import { loadFonts } from './render/fonts.js';
+import { familiesOf, isFamilySettled, loadFamilies, loadFonts } from './render/fonts.js';
 import { createMeasure } from './render/measure.js';
 import { base64ToBlob, validateImageFile, ImageError } from './render/images.js';
 import { exportCard, ExportError } from './render/export.js';
@@ -12,8 +15,8 @@ import { HANDOFF_KEY, clearDraft, readDraft, writeDraft } from './lib/storage.js
 import { useAssets } from './lib/useAssets.js';
 import { readLibrary, writeLibrary } from './model/library.js';
 import { DEFAULT_PALETTE_ID } from './config/palettes.js';
-import { DEFAULT_FONT_PAIR_ID } from './config/typography.js';
-import textureUrl from './assets/paper-texture.png';
+import { DEFAULT_FONT_PAIR_ID, getFontPair } from './config/typography.js';
+import { useTextures } from './lib/textures.js';
 import Header from './components/Header.jsx';
 import ContentPanel from './components/ContentPanel.jsx';
 import DesignPanel from './components/DesignPanel.jsx';
@@ -46,15 +49,6 @@ function takeHandoff() {
   }
 }
 
-function useTexture() {
-  const [img, setImg] = useState(null);
-  useEffect(() => {
-    const i = new Image();
-    i.onload = () => setImg(i);
-    i.src = textureUrl;
-  }, []);
-  return img;
-}
 
 export default function Studio({ onNavigate }) {
   const [{ source: initialSource, design: initialDesign, library: initialLibrary }] = useState(initialState);
@@ -63,14 +57,16 @@ export default function Studio({ onNavigate }) {
   const [library, setLibrary] = useState(initialLibrary);
   // A palette or pairing being edited, previewed live before it's saved.
   const [draftStyle, setDraftStyle] = useState(null);
-  const [fonts, setFonts] = useState({ ready: false, failed: [] });
+  // Bumped whenever a font family finishes loading, to refresh measurement.
+  const [fontVersion, setFontVersion] = useState(0);
+  const [fontsFailed, setFontsFailed] = useState([]);
   const [tab, setTab] = useState('content');
   const [toast, setToast] = useState(null);
   const [announcement, setAnnouncement] = useState('');
   const [exportFormat, setExportFormat] = useState('png');
   const [exporting, setExporting] = useState(false);
   const [storageWarning, setStorageWarning] = useState(null);
-  const texture = useTexture();
+  const textures = useTextures();
 
   const announce = useCallback((text) => {
     setAnnouncement('');
@@ -81,7 +77,12 @@ export default function Studio({ onNavigate }) {
 
   useEffect(() => {
     let alive = true;
-    loadFonts().then((r) => alive && setFonts({ ready: true, failed: r.failed }));
+    // Everything else loads in the background after the current pairing.
+    loadFonts().then((r) => {
+      if (!alive) return;
+      setFontsFailed(r.failed);
+      setFontVersion((v) => v + 1);
+    });
     return () => {
       alive = false;
     };
@@ -97,7 +98,6 @@ export default function Studio({ onNavigate }) {
   );
   const deferredContent = useDeferredValue(content);
 
-  const measure = useMemo(() => (fonts.ready ? createMeasure() : null), [fonts.ready]);
   const imageStats = useMemo(() => {
     const out = {};
     for (const [id, a] of Object.entries(assets)) {
@@ -124,6 +124,19 @@ export default function Studio({ onNavigate }) {
     if (draftStyle?.kind === 'fontPair') return { ...design, fontPairId: draftStyle.value.id };
     return design;
   }, [design, draftStyle]);
+  // Only the families the shown pairing uses gate the preview; measurement is
+  // rebuilt once they settle so cached widths never come from a fallback font.
+  const neededFamilies = familiesOf(getFontPair(shownDesign.fontPairId, fontPairs)).join('|');
+  const fontsReady = neededFamilies.split('|').every(isFamilySettled);
+  useEffect(() => {
+    let alive = true;
+    loadFamilies(neededFamilies.split('|')).then(() => alive && setFontVersion((v) => v + 1));
+    return () => {
+      alive = false;
+    };
+  }, [neededFamilies]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const measure = useMemo(() => (fontsReady ? createMeasure() : null), [fontsReady, fontVersion]);
   const env = useMemo(() => (measure ? { measure, images: imageStats, palettes, fontPairs } : null), [measure, imageStats, palettes, fontPairs]);
   const envRef = useRef(env);
   envRef.current = env;
@@ -346,6 +359,39 @@ export default function Studio({ onNavigate }) {
     announce(`Deleted “${item.label}”.`);
   }, [library, design, announce]);
 
+  // ---- shuffle -----------------------------------------------------------
+  const shuffle = useCallback(() => {
+    if (!env || !hasRenderableContent(content)) return;
+    const previous = design;
+    const next = shuffleDesign(content, design, { ...env, palettes: library.palettes, fontPairs: library.fontPairs });
+    if (!next) {
+      const msg = 'No other combination fits this content at this size. Try a taller size or shorter text.';
+      setToast({ text: msg, level: 'error' });
+      announce(msg);
+      return;
+    }
+    setDraftStyle(null);
+    setDesign(next);
+    const summary = [
+      getLayout(next.layoutId)?.label,
+      getPalette(next.paletteId, library.palettes).label,
+      getFontPair(next.fontPairId, library.fontPairs).label,
+      getBackground(next.backgroundId).label,
+    ].join(' · ');
+    setToast({
+      text: summary,
+      action: {
+        label: 'Undo',
+        run: () => {
+          setDesign(previous);
+          setToast(null);
+          announce('Previous design restored.');
+        },
+      },
+    });
+    announce(`Shuffled: ${summary}.`);
+  }, [env, content, design, library, announce]);
+
   // ---- export ------------------------------------------------------------
   const runExport = useCallback(async () => {
     if (exporting || !env) return;
@@ -355,7 +401,7 @@ export default function Studio({ onNavigate }) {
       const result = await exportCard({ schemaVersion: 1, content, design: shownDesign }, exportFormat, {
         env,
         images: imageElements,
-        texture,
+        textures,
         ensureFonts: async () => {
           await loadFonts();
           await document.fonts.ready;
@@ -372,7 +418,7 @@ export default function Studio({ onNavigate }) {
     } finally {
       setExporting(false);
     }
-  }, [exporting, env, content, shownDesign, exportFormat, imageElements, texture, announce]);
+  }, [exporting, env, content, shownDesign, exportFormat, imageElements, textures, announce]);
 
   const output = resolveOutput(shownDesign);
   const canExport = Boolean(scene?.ok && scene.fits && !exporting);
@@ -418,6 +464,7 @@ export default function Studio({ onNavigate }) {
         onCopied={(ok) => announce(ok ? 'Source URL copied.' : 'Copy failed. Your browser blocked clipboard access.')}
         exportControl={started ? exportControl : null}
         onHome={() => onNavigate?.('/')}
+        onShuffle={shuffle}
       />
 
       {!started ? (
@@ -434,11 +481,11 @@ export default function Studio({ onNavigate }) {
             <Preview
               scene={scene}
               images={imageElements}
-              texture={texture}
+              textures={textures}
               output={output}
               content={deferredContent}
-              fontsReady={fonts.ready}
-              fontWarning={fonts.failed.length ? `Some fonts failed to load (${fonts.failed.map((f) => f.replace('Carrd ', '')).join(', ')}); system fonts are used instead.` : null}
+              fontsReady={fontsReady}
+              fontWarning={fontsFailed.length ? `Some fonts failed to load (${fontsFailed.map((f) => f.replace('Carrd ', '')).join(', ')}); system fonts are used instead.` : null}
             />
           </section>
           <aside className="panel" aria-label="Card settings">
@@ -472,7 +519,7 @@ export default function Studio({ onNavigate }) {
                 env={env}
                 scene={scene}
                 images={imageElements}
-                texture={texture}
+                textures={textures}
                 assets={assets}
                 onChange={updateDesign}
                 onBackgroundImage={(file) => addImage('background', file)}

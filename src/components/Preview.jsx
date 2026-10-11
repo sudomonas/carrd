@@ -3,7 +3,7 @@ import SceneCanvas from './SceneCanvas.jsx';
 import { describeCard } from '../engine/compose.js';
 import { getLayout } from '../engine/layouts/index.js';
 
-export default function Preview({ scene, images, texture, output, content, fontsReady, fontWarning }) {
+export default function Preview({ scene, images, textures, output, content, fontsReady, fontWarning }) {
   const frameRef = useRef(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
 
@@ -40,7 +40,7 @@ export default function Preview({ scene, images, texture, output, content, fonts
               scene={scene}
               displayWidth={displayWidth}
               images={images}
-              texture={texture}
+              textures={textures}
               label={`Card preview, ${layout?.label ?? ''} layout. ${describeCard(content)}`}
             />
           )
@@ -52,7 +52,7 @@ export default function Preview({ scene, images, texture, output, content, fonts
       </div>
       <div className="preview-meta">
         <span className="preview-dims">
-          <strong>{output.label}</strong> {output.width} × {output.height} px
+          <strong>{output.name}</strong> {output.width} × {output.height} px
         </span>
         {layout && <span className="preview-layout">{layout.label}</span>}
       </div>
