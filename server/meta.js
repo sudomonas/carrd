@@ -58,6 +58,19 @@ function send(res, status, payload) {
 const fail = (res, code) => send(res, STATUS[code] ?? 502, { ok: false, code, error: MESSAGES[code] ?? MESSAGES.default });
 
 function readJson(req) {
+  // Some platforms (e.g. Vercel's Node runtime) may hand over a parsed body.
+  if (req.body !== undefined && req.body !== null) {
+    if (Buffer.isBuffer(req.body) || typeof req.body === 'string') {
+      const text = req.body.toString('utf8');
+      if (text.length > BODY_LIMIT) return Promise.reject(new FetchError('invalid_url'));
+      try {
+        return Promise.resolve(JSON.parse(text));
+      } catch {
+        return Promise.reject(new FetchError('invalid_url'));
+      }
+    }
+    if (typeof req.body === 'object') return Promise.resolve(req.body);
+  }
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
@@ -108,10 +121,12 @@ export async function fetchMetadata(url, { lookup } = {}) {
 }
 
 /**
- * Connect-style handler (works in the Vite dev server and plain node:http).
+ * Connect-style handler (works in the Vite dev server, plain node:http and
+ * serverless Node runtimes).
  * options.trustProxy: use the first X-Forwarded-For hop as the client key.
+ * options.clientIp:   custom (req) => key, e.g. a platform's trusted header.
  */
-export function createMetaHandler({ trustProxy = false, limit = 20, maxConcurrent = 8, log = console } = {}) {
+export function createMetaHandler({ trustProxy = false, clientIp = null, limit = 20, maxConcurrent = 8, log = console } = {}) {
   const allow = createRateLimiter({ limit });
   let active = 0;
   return async (req, res) => {
@@ -120,7 +135,7 @@ export function createMetaHandler({ trustProxy = false, limit = 20, maxConcurren
       return send(res, 405, { ok: false, error: 'Method not allowed.' });
     }
     if (!String(req.headers['content-type'] || '').includes('application/json')) return fail(res, 'invalid_url');
-    const client = (trustProxy && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || 'unknown';
+    const client = clientIp?.(req) || (trustProxy && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket?.remoteAddress || 'unknown';
     if (!allow(client)) return fail(res, 'rate_limited');
     if (active >= maxConcurrent) return fail(res, 'busy');
     active++;

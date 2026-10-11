@@ -88,3 +88,32 @@ describe('service guards', () => {
     expect(sniffImageType(Buffer.from('<html><body>not an image</body></html>'))).toBeNull();
   });
 });
+
+describe('serverless request shapes', () => {
+  const fakeRes = () => {
+    const res = { headers: {}, statusCode: 0, body: '' };
+    res.setHeader = (k, v) => { res.headers[k] = v; };
+    res.end = (b) => { res.body = b; res.done(); };
+    res.finished = new Promise((r) => { res.done = r; });
+    return res;
+  };
+
+  it('accepts a body the platform already parsed, and rejects bad URLs', async () => {
+    const { createMetaHandler } = await import('../server/meta.js');
+    const handler = createMetaHandler({ clientIp: () => 'test' });
+    const res = fakeRes();
+    handler({ method: 'POST', headers: { 'content-type': 'application/json' }, body: { url: 'ftp://example.com' } }, res);
+    await res.finished;
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({ ok: false, code: 'invalid_url' });
+  });
+
+  it('blocks internal addresses from a parsed body too', async () => {
+    const { createMetaHandler } = await import('../server/meta.js');
+    const handler = createMetaHandler({ clientIp: () => 'test2' });
+    const res = fakeRes();
+    handler({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: 'http://169.254.169.254/' }) }, res);
+    await res.finished;
+    expect(res.statusCode).toBe(422);
+  });
+});

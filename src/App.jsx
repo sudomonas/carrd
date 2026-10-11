@@ -231,7 +231,7 @@ export default function Studio({ onNavigate }) {
       });
       const data = await res.json().catch(() => null);
       if (res.status === 404 && !data) {
-        throw new Error('Link details need the carrd server (run “npm start”). You can fill them in below.');
+        throw new Error('Link details aren’t available on this deployment. You can fill them in below.');
       }
       if (!res.ok || !data?.ok) throw new Error(data?.error ?? 'We couldn’t read that page.');
       const m = data.meta;

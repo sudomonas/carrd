@@ -27,7 +27,16 @@ npm start                        # serve dist/ + /api/meta on http://127.0.0.1:4
 
 `npm start` reads the `PORT` and `HOST` environment variables. It also reads `TRUST_PROXY=1`, which rate-limits by the first `X-Forwarded-For` hop. Set that only behind a trusted reverse proxy.
 
-Text, image, code and list cards work from any static hosting of `dist/`. Only link extraction needs the Node server.
+Text, image, code and list cards work from any static hosting of `dist/`. Only link extraction needs a server.
+
+### Deploying to Vercel
+
+`vercel.json` and `api/meta.js` are included.
+- **Link extraction:** `api/meta.js` is a serverless function that wraps the same SSRF-hardened handler as `npm start`. Rate limiting uses Vercel's `x-real-ip` header, and the function's time limit is 20 s.
+- **Routes:** a rewrite serves `index.html` for `/studio` and other app routes, so direct links and reloads work.
+- **Headers:** the same Content-Security-Policy and security headers as the Node server.
+
+The rate limiter lives in memory, so on serverless it applies per instance, not globally.
 
 ## Architecture
 
